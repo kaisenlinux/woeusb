@@ -1,0 +1,35 @@
+Author: Kevin Chevreuil - Kaisen <kaisen@kaisen-linux.org>
+
+--- woeusb-3.3.1.orig/src/linux-menu/woeusbgui.desktop
++++ woeusb-3.3.1/src/linux-menu/woeusbgui.desktop
+@@ -1,16 +1,18 @@
++#!/usr/bin/env xdg-open
++
+ [Desktop Entry]
+-Version=1.0
+-Exec=woeusbgui
++Name=WoeUSB
++Comment=Tool to create Windows/WindowsPE USB stick installer
++Comment[fr]=Outil pour créer une clé USB bootable Windows/WindowsPE
++Comment[es]=Herramienta para crear una llave USB de arranque de Windows/Windows PE
++Comment[pt]=Ferramenta para criar uma chave USB inicializável do Windows/Windows PE
++Comment[it]=Strumento per creare una chiave USB Windows/Windows PE avviabile
++Comment[de]=Tool zum Erstellen eines bootfähigen Windows/Windows PE-USB-Sticks
++Exec=sh -c "gksudo woeusbgui"
+ Icon=woeusbgui-icon
+-Terminal=false
+ X-MultipleArgs=false
+-Type=Application
+-Categories=System;
+-Keywords=Windows;UEFI;EFI;booting;
++Categories=USBBoot
+ StartupNotify=true
+-Name=WoeUSB
+-Name[fr_FR]=WoeUSB
+-Name[zh_TW]=WoeUSB Windows 可開機 USB 製作工具
+-Comment=Create Windows USB stick installer from a real Windows DVD or an image.
+-Comment[fr_FR]=Créer des clés USB d'installation de Windows depuis une image CD ou un dvd original.
+-Comment[zh_TW]=從一個既有的 Windows DVD 或光碟映像檔建立 Windows 可開機 USB 安裝碟
++Terminal=false
++Type=Application
++Version=1.0
