@@ -1,3 +1,9 @@
+woeusb (3.3.1-1kaisen2) kaisen-packages; urgency=medium
+
+  * Create CLI launcher
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisen-linux.org>  Sun, 11 Oct 2020 20:08:46 +0200
+
 woeusb (3.3.1-1kaisen1) kaisen-packages; urgency=medium
 
   * First packaging for Kaisen Linux
