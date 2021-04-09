@@ -1,9 +1,9 @@
 Source: woeusb
 Priority: optional
 Section: utils
-Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisen-linux.org>
+Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 Build-Depends: debhelper, dh-autoreconf, libwxgtk3.0-gtk3-dev
-Standards-Version: 4.5.0
+Standards-Version: 4.5.1
 Vcs-Git: https://gitlab.com/kaisenlinux/packages/woeusb.git
 Vcs-Browser: https://gitlab.com/kaisenlinux/packages/woeusb
 
