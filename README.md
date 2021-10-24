@@ -1,85 +1,107 @@
 # WoeUSB
-[![Latest Release](https://img.shields.io/github/release/slacka/WoeUSB.svg)](https://github.com/slacka/WoeUSB/releases)
-[![WoeUSB License](https://img.shields.io/badge/license-gpl-blue.svg)](https://github.com/slacka/WoeUSB/blob/master/COPYING)
-[![Build Status](https://travis-ci.org/slacka/WoeUSB.svg?branch=master)](https://travis-ci.org/slacka/WoeUSB)
 
-![brand](src/data/woeusb-logo.png)[![thumbnail of GUI wrapper screenshot](dev/woeusbgui-screenshot.thumbnail.png)](dev/woeusbgui-screenshot.png)[![thumbnail of CLI application screenshot](dev/woeusb-screenshot.thumbnail.png)](dev/woeusb-screenshot.png)
+<https://github.com/WoeUSB/WoeUSB>
 
-_A Linux program to create a Windows USB stick installer from a real Windows DVD or image._
+A Microsoft Windows® USB installation media preparer for GNU+Linux
 
-This package contains two programs:
+[![Continuous Integration(CI) Status Badge](https://cloud.drone.io/api/badges/WoeUSB/WoeUSB/status.svg "Continuous Integration(CI) Status")](https://cloud.drone.io/WoeUSB/WoeUSB) [![REUSE status](https://api.reuse.software/badge/github.com/WoeUSB/WoeUSB)](https://api.reuse.software/info/github.com/WoeUSB/WoeUSB)
 
-* woeusb: A command-line utility that enables you to create your own bootable Windows installation USB storage device from an existing Windows Installation disc or disk image
-* woeusbgui: A GUI wrapper of woeusb based on WxWidgets
+![WoeUSB logo](share/woeusb/woeusb.svg "Logo of WoeUSB")
 
-Supported images:
+## Features
 
-Windows Vista, Windows 7, Window 8.x, Windows 10. All languages and any version (home, pro...) and Windows PE are supported.
+* Support Legacy PC/UEFI booting
+* Support FAT32 and NTFS filesystems
+* Support using physical installation disc or disk image as source
 
-Supported bootmodes:
+## Supported Windows® installation images
 
-* Legacy/MBR-style/IBM PC compatible bootmode
-* Native UEFI booting is supported for Windows 7 and later images (limited to the FAT filesystem as the target)
+* Windows Vista and later
+* Any language or edition variants
+* Windows PE
 
-This project is a fork of [Congelli501's WinUSB software](http://en.congelli.eu/prog_info_winusb.html), which has not been maintained since 2012, according to the official website.
+> **NOTE:** Non official installation media may be supported, but not guaranteed
+
+## Dependencies
+
+The following are the dependencies that WoeUSB requires, in one way or another.  Refer [the wiki](https://github.com/WoeUSB/WoeUSB/wiki/Dependencies) for distro-specific information.
+
+### Required
+
+WoeUSB will not be able to function without these software installed in their proper locations:
+
+* [GNU Bash](https://www.gnu.org/software/bash/)  
+  For interpreting and executing the program logic  
+  _Requires >= 4.3_
+* [The GNU Core Utilities(Coreutils)](https://www.gnu.org/software/coreutils/)  
+  For common Unix utilities necessary for basic operations
+* [util-linux](https://github.com/karelzak/util-linux)  
+  For low-level utilities interacting with storage devices, etc
+* [GNU Grep](https://www.gnu.org/software/grep/) and [Gawk](https://www.gnu.org/software/gawk/)  
+  For parsing necessary information out from a command output
+* [The GNU Find Utilities](https://www.gnu.org/software/findutils/)  
+  For enumerating files required for operation
+* [GNU GRUB](https://www.gnu.org/software/grub/)  
+  For installing the bootstrap code used in a Legacy PC boot  
+  We specifically requires modules of the i386-pc architecture, for Debian-based distributions these are provided via the grub-pc-bin package
+* [GNU Parted](https://www.gnu.org/software/parted/)  
+  For manipulating disk partition table and partitions
+* [GNU Wget](https://www.gnu.org/software/wget/)  
+  For acquiring [Pete Batard](https://pete.akeo.ie/)'s [UEFI:NTFS](https://github.com/pbatard/uefi-ntfs) UEFI bootloader
+* [dosfstools](https://github.com/dosfstools/dosfstools)  
+  For creating FAT filesystem in `--device` creation method
+* [NTFS-3G](https://www.tuxera.com/community/open-source-ntfs-3g/)  
+  For creating NTFS filesystem in `--device` creation method
+* [wimlib](https://wimlib.net/)  
+  For splitting install.wim Windows Imaging (WIM) archive so that archives over 4GiB can be fit in an FAT32 filesystem
+
+### Optional
+
+Without the following dependencies WoeUSB will still able to run, but some functionalities will be unavailable:
+
+* [p7zip](https://sourceforge.net/projects/p7zip/)  
+  For workaround the problem where the Windows 7 installation media doesn't ship their UEFI bootloader in the proper location
+* [Pete Batard](https://pete.akeo.ie/)'s [UEFI:NTFS](https://github.com/pbatard/uefi-ntfs) UEFI bootloader  
+  For supporting NTFS filesystems in the target USB key
 
 ## Installation
-### Prebuilt Packages
-Note that prebuilt packages are not necessarily the latest release and we are NOT responsible for the trustworthiness of these packages.  Regarding any related issues contact its maintainer first.
 
-#### Official Distribution Packages
-* [Fedora](https://src.fedoraproject.org/rpms/WoeUSB) packages maintained by mprahl
-* [openSUSE](https://software.opensuse.org/package/WoeUSB) packages maintained by [guoyunhe](https://guoyunhe.me/)
-* [Gentoo](https://packages.gentoo.org/packages/sys-boot/woeusb) packages maintained by pacho
+To be addressed.  For now refer [Run from source](#run-from-source).
 
-#### Third-party Distribution Packages
-* [Arch Linux](https://aur.archlinux.org/packages/woeusb-git/) packages maintained by darkfm
-* [Ubuntu](https://launchpad.net/%7Enilarimogard/+archive/ubuntu/webupd8) packages maintained by [WebUpd8](http://www.webupd8.org/)
+## Run from source
 
-### Build from Source
-The following are the instructions to install WoeUSB if prebuilt version is not available or too old.
+WoeUSB is a program that can be run without installation(excluding its [dependencies](#dependencies)):
 
-#### Acquire WoeUSB's Source Code
-Clone WoeUSB's Git repository to your local machine using `git clone https://github.com/slacka/WoeUSB.git`
-
-NOTE: We no longer support building from source archives provided in the GitHub Releases page as the software version is not set.
-
-#### Setting the Application Version String
-This step is required for generating the proper version name based on the Git tags. This step should be repeated if the version is changed.
-
-```shell
-$ ./setup-development-environment.bash
-```
-
-#### Install WoeUSB's Build Dependencies
-```shell
-# For Debian-based distributions (NOTE: For your convenience, this package is already provided in the release page)
-$ sudo apt-get install devscripts equivs gdebi-core
-$ cd <WoeUSB source tree directory, the folder that contains the `src` folder>
-$ mk-build-deps # NOTE: Currently, due to Debian Bug #679101, this command will fail if the source path contains spaces.
-$ sudo gdebi woeusb-build-deps_<version>_all.deb
-
-# For Fedora > 22
-$ sudo dnf install wxGTK3-devel
-
-# For Fedora 22
-$ sudo dnf install wxGTK-devel dh-autoreconf.noarch
-
-# For Opensuse
-$ sudo zypper in wxGTK3-3_2-devel dh-autoreconf devscripts
-```
-#### Build & Install WoeUSB
-```shell
-# For Debian-based distributions
-$ dpkg-buildpackage -uc -b # NOTE: Currently, due to a bug in the build system, this command will fail if the source's path contains space or single quotes, refer to issue #84 for details
-$ sudo gdebi ../woeusb_<version>_<architecture>.deb
-
-# Generic method
-$ autoreconf --force --install # Most non-Debian derived distros will need this
-$ ./configure
-$ make
-$ sudo make install
-```
+1. Download the program(woeusb-N.N.N.bash) from [the Releases page](https://github.com/WoeUSB/WoeUSB/releases)
+1. Fix the missing executable file permission (`chmod +x path/to/woeusb-N.N.N.bash`)
+1. Launch a terminal application and run the program via the appropriate path(`sudo path/to/woeusb-N.N.N.bash --help`)
 
 ## License
-WoeUSB is distributed under the [GPL license](https://github.com/slacka/WoeUSB/blob/master/COPYING).
+
+WoeUSB is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+WoeUSB is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with WoeUSB.  If not, see <http://www.gnu.org/licenses/>.
+
+### Identify _otherwise specified_ licenses applicable to a certain product/development asset
+
+If the asset is in plaintext format:
+
+1. Check the `SPDX-License-Identifier` tag in the file's header
+1. Check the [.reuse/dep5](.reuse/dep5) file from the source tree/release tree directory
+
+If the asset is not in plaintext format:
+
+Check the [.reuse/dep5](.reuse/dep5) file from the source tree/release tree directory
+
+## Credits
+
+WoeUSB is a fork of [Congelli501's WinUSB project](http://en.congelli.eu/prog_info_winusb.html).

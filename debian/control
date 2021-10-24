@@ -2,22 +2,22 @@ Source: woeusb
 Priority: optional
 Section: utils
 Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
-Build-Depends: debhelper, dh-autoreconf, libwxgtk3.0-gtk3-dev
-Standards-Version: 4.5.1
+Build-Depends: debhelper
+Standards-Version: 4.6.1
+Homepage: https://github.com/WoeUSB/WoeUSB
 Vcs-Git: https://gitlab.com/kaisenlinux/packages/woeusb.git
 Vcs-Browser: https://gitlab.com/kaisenlinux/packages/woeusb
 
 Package: woeusb
 Section: utils
 Architecture: amd64
-Depends: bash, dosfstools, gettext, grub2-common, grub-pc-bin, ntfsprogs | ntfs-3g, p7zip-full, parted, policykit-1, realpath | coreutils, wget, libc6, libgcc-s1, libstdc++6, libwxbase3.0-0v5, libwxgtk3.0-gtk3-0v5, ${shlibs:Depends}
+Depends: bash, dosfstools, gettext, grub2-common, grub-pc-bin, ntfs-3g, p7zip-full, parted, coreutils, wget, libc6, libgcc-s1, libstdc++6, libwxbase3.0-0v5, wimtools, libwim15, ${shlibs:Depends}
 Description: Bootable Windows installation/PE USB storage creator
  This package contains two programs:
  .
   - woeusb: An command-line utility that enables you to create your own bootable
   Windows installation USB storage device from an existing Windows Installation
   DVD or its ISO image.
-  - woeusbgui: A woeusb's GUI wrapper program based on WxWidgets GUI library.
  .
  Supported images: Windows Vista~10+ installation media for any language and
  edition(Home/Professional...) and Windows PE-based media.
