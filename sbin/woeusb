@@ -16,10 +16,13 @@
 # lint: We use indirections and primitive variables, which is false positive of this rule
 # shellcheck disable=SC2034
 
+RUFUS_UEFI_NTFS_VERSION="${RUFUS_UEFI_NTFS_VERSION:-b30e3b387a3ca7a5e2fddebcc2c8f9538a89b868}"
+
 # Entry point of the main code
 init(){
-    check_function_parameters_quantity 1 $#
+    check_function_parameters_quantity 2 $#
     local -r program_name="$1"; shift
+    local -r rufus_uefi_ntfs_version="$1"; shift
 
     local -r application_name='WoeUSB'
     local -r application_version='@@WOEUSB_VERSION@@'
@@ -49,22 +52,9 @@ init(){
         target_filesystem_type=FS_FAT \
         target_fs_label='Windows USB'
 
-    source_fs_mountpoint="$(
-        mktemp \
-            -d \
-            -t \
-            woeusb-source-"$(generate_timestamp)".XXXXXX
-    )"
-    target_fs_mountpoint="$(
-        mktemp \
-            -d \
-            -t \
-            woeusb-target-"$(generate_timestamp)".XXXXXX
-    )"
-
     # Parameters that needs to be determined in runtime
     # due to different names in distributions
-    declare \
+    local \
         command_mkdosfs \
         command_mkntfs \
         command_grubinstall \
@@ -143,6 +133,19 @@ init(){
         "${target_device}" \
         "${target_partition}"
 
+    source_fs_mountpoint="$(
+        mktemp \
+            -d \
+            -t \
+            woeusb-source-"$(generate_timestamp)".XXXXXX
+    )"
+    target_fs_mountpoint="$(
+        mktemp \
+            -d \
+            -t \
+            woeusb-target-"$(generate_timestamp)".XXXXXX
+    )"
+
     if ! mount_source_filesystem \
         "${source_media}" \
         "${source_fs_mountpoint}"; then
@@ -169,7 +172,7 @@ init(){
                 "${target_device}"
             install_uefi_ntfs_support_partition \
                 "${target_device}2" \
-                "${temp_directory}" \
+                "${temp_dir}" \
                 "${target_device}"
         fi
     fi
@@ -402,7 +405,7 @@ process_commandline_parameters(){
                 if [ "${#parameters[@]}" -lt 2 ]; then
                     print_error \
                         -- \
-                        '--device option requires 2 arguments!'
+                        '--device option requires 2 arguments!\n'
                     return 1
                 fi
                 source_media_ref="${parameters[0]}"
@@ -410,13 +413,13 @@ process_commandline_parameters(){
                 target_media_ref="${parameters[0]}"
                 ;;
             --verbose|-v)
-                verbose=true
+                flag_verbose=true
                 ;;
             --for-gui)
-                no_color=true
+                flag_no_color=true
                 ;;
             --no-color)
-                no_color=true
+                flag_no_color=true
                 ;;
             --label|-l)
                 enable_label=true
@@ -531,7 +534,7 @@ process_commandline_parameters(){
         esac
     fi
 
-    if [ "${verbose}" = true ] && [ "${enable_debug}" != true ]; then
+    if [ "${flag_verbose}" = true ] && [ "${enable_debug}" != true ]; then
         trap 'trap_return "${FUNCNAME[0]}"' RETURN
     fi
 
@@ -759,7 +762,7 @@ determine_target_parameters(){
             ;;
             *)
                 print_error \
-                    'Unsupported target filesystem "%s", currently supported target filesystems: %s, %s' \
+                    'Unsupported target filesystem "%s", currently supported target filesystems: %s, %s\n' \
                     "${target_filesystem_type_libblkid}" \
                     "${ENUM_SUPPORTED_FILESYSTEMS[FS_FAT]}" \
                     "${ENUM_SUPPORTED_FILESYSTEMS[FS_NTFS]}"
@@ -772,7 +775,7 @@ determine_target_parameters(){
         target_partition_ref="${target_device}1"
     fi
 
-    if [ "${verbose}" = true ]; then
+    if [ "${flag_verbose}" = true ]; then
         print_info \
             "Target device is '%s'.\\n" \
             "${target_device_ref}"
@@ -927,14 +930,14 @@ workaround_make_system_realize_partition_table_changed(){
     local -r target_device="$1"
 
     print_info \
-        'Making system realize that partition table has changed...'
+        'Making system realize that partition table has changed...\n'
 
     blockdev \
         --rereadpt \
         "${target_device}" \
         || true
     print_info \
-        'Wait 3 seconds for block device nodes to populate...'
+        'Wait 3 seconds for block device nodes to populate...\n'
     sleep 3
 
 }
@@ -968,7 +971,7 @@ create_target_partition(){
     esac
 
     print_info \
-        'Creating target partition...'
+        'Creating target partition...\n'
 
     # Create target partition
     # We start at 4MiB for grub (it needs a post-mbr gap for its code) and alignment of flash memery block erase segment in general, for details see http://www.gnu.org/software/grub/manual/grub.html#BIOS-installation and http://lwn.net/Articles/428584/
@@ -992,8 +995,8 @@ create_target_partition(){
                 primary \
                 "${parted_mkpart_fs_type}" \
                 4MiB \
-                -- -1025s # Leave 512KiB==1024sector in traditional 512bytes/sector disk, disks with sector with more than 512bytes only result in partition size greater than 512KiB and is intentionally let-it-be.
-                # FIXME: Leave exact 512KiB in all circumstances is better, but the algorithm to do so is quite brainkilling.
+                -- -2049s # Leave 1024KiB==2048sector in traditional 512bytes/sector disk, disks with sector with more than 512bytes only result in partition size greater than 1024KiB and is intentionally let-it-be.
+                # FIXME: Leave exact 1024KiB in all circumstances is better, but the algorithm to do so is quite brainkilling.
             ;;
         *)
             print_fatal \
@@ -1029,7 +1032,7 @@ create_target_partition(){
 
 # Create UEFI:NTFS partition to support booting UEFI bootloader in NTFS filesystem where some UEFI firmwares are not able to do so
 # https://github.com/pbatard/uefi-ntfs
-# This routine assumes that there's only one partition on the disk, and the trailing 512KiB space is not partitioned
+# This routine assumes that there's only one partition on the disk, and the trailing 1024KiB space is not partitioned
 # This routine should be run after create_target_partition and only on target partition's filesystem is NTFS
 # target_device: The target device's entire deice file
 create_uefi_ntfs_support_partition(){
@@ -1047,7 +1050,7 @@ create_uefi_ntfs_support_partition(){
         primary \
         fat16 \
         --  \
-        -1024s \
+        -2048s \
         -1s
 
     return "$?"
@@ -1059,15 +1062,16 @@ create_uefi_ntfs_support_partition(){
 # download_directory: The temporary directory for downloading UEFI:NTFS image from GitHub
 # target_device: For workaround_make_system_realize_partition_table_changed
 install_uefi_ntfs_support_partition(){
-    check_function_parameters_quantity 3 $#
+    check_function_parameters_quantity 4 $#
 
+    local -r rufus_uefi_ntfs_version="$1"; shift
     local -r uefi_ntfs_partition="$1"; shift
     local -r download_directory="$1"; shift
     local -r target_device="$1"
 
     if ! wget \
         --directory-prefix="${download_directory}" \
-        https://github.com/pbatard/rufus/raw/master/res/uefi/uefi-ntfs.img; then
+        "https://cdn.jsdelivr.net/gh/pbatard/rufus@${rufus_uefi_ntfs_version}/res/uefi/uefi-ntfs.img"; then
         print_warning \
             "Unable to download UEFI:NTFS partition image from GitHub, installation skipped.  Target device might not be bootable if the UEFI firmware doesn't support NTFS filesystem.\\n"
         return 0
@@ -1296,9 +1300,9 @@ check_target_filesystem_free_space(){
 
     if [ "${needed_space}" -gt "${free_space}" ]; then
         print_error \
-            'Not enough free space on target partition!'
+            'Not enough free space on target partition!\n'
         print_error \
-            "We required %s(%u bytes) but '%s' only has %s(%u bytes)." \
+            "We required %s(%u bytes) but '%s' only has %s(%u bytes).\n" \
             "${needed_space_human_readable}" \
             "${needed_space}" \
             "${target_partition}" \
@@ -1341,7 +1345,7 @@ copy_filesystem_files(){
         if [ -d "${source_file}" ]; then
             mkdir --parents "${dest_file}"
         elif [ -f "${source_file}" ]; then
-            if [ "${verbose}" = true ]; then
+            if [ "${flag_verbose}" = true ]; then
                 print_info \
                     'Copying "%s"...\n' \
                     "${source_file}"
@@ -1544,14 +1548,14 @@ workaround_support_windows_7_uefi_boot(){
     )"
     if [ -z "${test_efi_directory}" ]; then
         efi_directory="${target_fs_mountpoint}/efi"
-        if [ "${verbose}" = true ]; then
+        if [ "${flag_verbose}" = true ]; then
             print_debug \
                 "Can't find efi directory, use %s.\\n" \
                 "${efi_directory}"
         fi
     else # efi directory(case don't care) exists
         efi_directory="${test_efi_directory}"
-        if [ "${verbose}" = true ]; then
+        if [ "${flag_verbose}" = true ]; then
             print_debug \
                 '%s detected.\n' \
                 "${efi_directory}"
@@ -1569,14 +1573,14 @@ workaround_support_windows_7_uefi_boot(){
     )"
     if [ -z "${test_efi_boot_directory}" ]; then
         efi_boot_directory="${efi_directory}/boot"
-        if [ "${verbose}" = true ]; then
+        if [ "${flag_verbose}" = true ]; then
             print_debug \
                 "Can't find efi/boot directory, use %s.\\n" \
                 "${efi_boot_directory}"
         fi
     else # boot directory(case don't care) exists
         efi_boot_directory="${test_efi_boot_directory}"
-        if [ "${verbose}" = true ]; then
+        if [ "${flag_verbose}" = true ]; then
             print_debug \
                 '%s detected.\n' \
                 "${efi_boot_directory}"
@@ -1723,7 +1727,7 @@ trap_exit(){
         sleep 1
     fi
 
-    if util_is_parameter_set_and_not_empty \
+    if is_var_set_and_not_empty \
         source_fs_mountpoint; then
         if ! cleanup_mountpoint  \
             "${source_fs_mountpoint}"; then
@@ -1731,7 +1735,7 @@ trap_exit(){
         fi
     fi
 
-    if util_is_parameter_set_and_not_empty \
+    if is_var_set_and_not_empty \
         target_fs_mountpoint; then
         if ! cleanup_mountpoint \
             "${target_fs_mountpoint}"; then
@@ -1760,7 +1764,7 @@ trap_exit(){
         flag_unsafe
 
     if \
-        util_is_parameter_set_and_not_empty\
+        is_var_set_and_not_empty\
             target_device; then
         if is_target_busy "${target_device}"; then
             print_warning \
@@ -1773,7 +1777,7 @@ trap_exit(){
 
     rm \
         --recursive \
-        "${temp_directory}"
+        "${temp_dir}"
 
     return 0
 }
@@ -1791,7 +1795,7 @@ trap_return(){
 
     for ignored_function in \
         check_function_parameters_quantity \
-        util_is_parameter_set_and_not_empty \
+        is_var_set_and_not_empty \
         switch_terminal_text_color \
         printf_with_color \
         print_info \
@@ -1901,12 +1905,12 @@ printf_with_color(){
     local -r color="${1}"; shift
     local -ar printf_parameters=("${@}")
 
-    if [ "${no_color}" == true ]; then
+    if [ "${flag_no_color}" == true ]; then
         # False positive: not format string(ShellCheck #1028)
         # shellcheck disable=SC2059
         printf -- \
             "${printf_parameters[@]}"
-    else # no_color = false
+    else # flag_no_color = false
         switch_terminal_text_color "${color}"
         # False positive: not format string(ShellCheck #1028)
         # shellcheck disable=SC2059
@@ -2042,7 +2046,7 @@ shift_array(){
     return 0
 }
 
-util_is_parameter_set_and_not_empty(){
+is_var_set_and_not_empty(){
     check_function_parameters_quantity 1 $#
 
     local parameter_name="${1}"
@@ -2050,7 +2054,7 @@ util_is_parameter_set_and_not_empty(){
     if [ ! -v "${parameter_name}" ]; then
         return 1
     else
-        declare -n parameter_ref
+        local -n parameter_ref
         parameter_ref="${parameter_name}"
 
         if [ -z "${parameter_ref}" ]; then
@@ -2134,9 +2138,9 @@ done
 # BASHDOC: Basic Shell Features » Shell Parameters » Special Parameters
 if [ -v 'BASH_SOURCE[0]' ]; then
     script_path="$(realpath --strip "${BASH_SOURCE[0]}")"
-    script_filename="$(basename "${script_path}")"
-    script_name="${script_filename%.*}"
-    script_dir="$(dirname "${script_path}")"
+    script_filename="${script_path##*/}"
+    script_name="${script_filename%%.*}"
+    script_dir="${script_path%/*}"
     program_basecommand="${0}"
     # Keep these partially unused variables declared
     # shellcheck disable=SC2034
@@ -2146,6 +2150,13 @@ if [ -v 'BASH_SOURCE[0]' ]; then
         script_name \
         script_dir \
         program_basecommand
+else
+    # sane defaults
+    script_name=_script_
+    program_basecommand=_script_
+    script_filename=_script_
+    script_dir=
+    script_path=
 fi
 declare -ar program_args=("${@}")
 
@@ -2155,13 +2166,13 @@ declare -ar program_args=("${@}")
 # or indirectly referenced by traps
 #
 # Even when the parameter is set global, you should pass it in as function
-# argument when it's possible for better code reusability.
+# argument whenever it's possible for better code reusability.
 
 # Increase verboseness, provide more information when required
-declare verbose=false
+declare flag_verbose=false
 
 # Disable message coloring when set to `true`, set by --no-color
-declare no_color=false
+declare flag_no_color=false
 
 declare -ir DD_BLOCK_SIZE="((4 * 1024 * 1024))" # 4MiB
 declare -ir FAT32_FILESIZE_LIMIT=4294967295 # 2^32 - 1
@@ -2183,15 +2194,16 @@ trap trap_exit EXIT
 trap trap_errexit ERR
 trap trap_interrupt INT
 
-declare temp_directory; temp_directory=$(
+declare temp_dir; temp_dir=$(
     mktemp \
         -d \
         -t \
         WoeUSB.tempdir.XXXXXX
-); declare -r temp_directory
+); declare -r temp_dir
 
 # wimlib's process ID, needed to be killed in EXIT trap
 declare wimlib_imagex_pid=
 
 init \
-    "${script_name}"
+    "${script_name}" \
+    "${RUFUS_UEFI_NTFS_VERSION}"

@@ -1,3 +1,9 @@
+woeusb (5.2.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Update in 5.2.0 version
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Fri, 12 Nov 2021 21:14:36 +0200
+
 woeusb (5.1.2-1kaisen) kaisen-packages; urgency=medium
 
   * Update in 5.1.2 version

@@ -76,6 +76,16 @@ WoeUSB is a program that can be run without installation(excluding its [dependen
 1. Fix the missing executable file permission (`chmod +x path/to/woeusb-N.N.N.bash`)
 1. Launch a terminal application and run the program via the appropriate path(`sudo path/to/woeusb-N.N.N.bash --help`)
 
+## Usage
+
+### Environment variables
+
+The following are the environment variables that may change WoeUSB's runtime behavior:
+
+| Variable name | Usage |
+| :-: | :-- |
+| RUFUS_UEFI_NTFS_VERSION | The release tag/revision of [the Rufus source tree](https://github.com/pbatard/rufus) to fetch the UEFI:NTFS image from, will use a tested version by default |
+
 ## License
 
 WoeUSB is free software: you can redistribute it and/or modify
@@ -104,4 +114,10 @@ Check the [.reuse/dep5](.reuse/dep5) file from the source tree/release tree dire
 
 ## Credits
 
-WoeUSB is a fork of [Congelli501's WinUSB project](http://en.congelli.eu/prog_info_winusb.html).
+* WoeUSB is a fork of [Colin GILLE's WinUSB project](https://web.archive.org/web/20210228120035/http://en.congelli.eu/prog_info_winusb.html), without standing on their shoulders WoeUSB will not exist in the first place
+* We would like to thank [@slacka](https://github.com/slacka) for the maintenance of the WoeUSB project [when it was hosted under their namespace](https://github.com/slacka/WoeUSB), they have been extremely helpful and cooperative in many conversations that contributed in WoeUSB's improvement
+* We would like to thank [Pete Batard](https://pete.akeo.ie/) for their splendid work on the [UEFI:NTFS](https://github.com/pbatard/uefi-ntfs) UEFI bootloader, which is included in WoeUSB to enable the NTFS filesystem support
+* Source code contributors on GitHub:
+    + [Contributors to WoeUSB/WoeUSB](https://github.com/WoeUSB/WoeUSB/graphs/contributors)
+    + [Contributors to slacka/WoeUSB](https://github.com/slacka/WoeUSB/graphs/contributors)
+* Everyone who have contributed to WoeUSB in one way or another but we're unable to enumerate them due to our ignorance
