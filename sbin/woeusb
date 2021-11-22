@@ -17,12 +17,14 @@
 # shellcheck disable=SC2034
 
 RUFUS_UEFI_NTFS_VERSION="${RUFUS_UEFI_NTFS_VERSION:-b30e3b387a3ca7a5e2fddebcc2c8f9538a89b868}"
+DD_BLOCK_SIZE="${DD_BLOCK_SIZE:-$((4 * 1024 * 1024))}" # 4MiB
 
 # Entry point of the main code
 init(){
-    check_function_parameters_quantity 2 $#
-    local -r program_name="$1"; shift
-    local -r rufus_uefi_ntfs_version="$1"; shift
+    check_function_parameters_quantity 3 "${#}"
+    local -r program_name="${1}"; shift
+    local -r rufus_uefi_ntfs_version="${1}"; shift
+    local -r dd_block_size="${1}"; shift
 
     local -r application_name='WoeUSB'
     local -r application_version='@@WOEUSB_VERSION@@'
@@ -30,7 +32,7 @@ init(){
     local \
         flag_print_help=false \
         flag_print_version=false \
-        flag_print_about=false \
+        flag_print_about=false
 
     local -r \
         application_site_url=https://github.com/WoeUSB/WoeUSB \
@@ -38,7 +40,7 @@ init(){
         application_copyright_notice="${application_name} is free software licensed under the GNU General Public License version 3(or any later version of your preference) that gives you THE 4 ESSENTIAL FREEDOMS\\nhttps://www.gnu.org/philosophy/"
     local install_mode
 
-    # source_media may be a optical disk drive or a disk image
+    # source_media may be an optical disk drive or a disk image
     # target_media may be an entire usb storage device or just a partition
     local \
         source_media \
@@ -105,7 +107,7 @@ init(){
         "${application_name} v${application_version}" \
         '=============================='
 
-    check_permission \
+    check_superuser \
         "${application_name}"
 
     if ! check_runtime_parameters \
@@ -150,7 +152,8 @@ init(){
         "${source_media}" \
         "${source_fs_mountpoint}"; then
         print_error \
-            'Unable to mount source filesystem\n'
+            'Unable to mount source filesystem in %s\n' \
+            "${source_media}"
         exit 1
     fi
 
@@ -171,6 +174,7 @@ init(){
             create_uefi_ntfs_support_partition \
                 "${target_device}"
             install_uefi_ntfs_support_partition \
+                "${rufus_uefi_ntfs_version}" \
                 "${target_device}2" \
                 "${temp_dir}" \
                 "${target_device}"
@@ -189,7 +193,8 @@ init(){
         "${target_fs_mountpoint}"  \
         "${target_filesystem_type}"; then
         print_error \
-            'Unable to mount target filesystem\n'
+            'Unable to mount target filesystem in %s\n' \
+            "${target_partition}"
         exit 1
     fi
 
@@ -201,7 +206,8 @@ init(){
     copy_filesystem_files \
         "${source_fs_mountpoint}" \
         "${target_fs_mountpoint}" \
-        "${target_filesystem_type}"
+        "${target_filesystem_type}" \
+        "${dd_block_size}"
 
     workaround_support_windows_7_uefi_boot \
         "${source_fs_mountpoint}" \
@@ -232,9 +238,9 @@ init(){
 print_help(){
     check_function_parameters_quantity 3 "${#}"
 
-    local -r application_name="$1"; shift 1
-    local -r application_version="$1"; shift 1
-    local -r program_name="$1"
+    local -r application_name="${1}"; shift
+    local -r application_version="${1}"; shift
+    local -r program_name="${1}"; shift
 
     set +o xtrace
     echo -e "${application_name} ${application_version} Help Information"
@@ -304,9 +310,9 @@ print_help(){
 # Print application version then exit, for debugging purpose.
 # application_version: Version of the application
 print_version(){
-    check_function_parameters_quantity 1 $#
+    check_function_parameters_quantity 1 "${#}"
 
-    local -r application_version="$1"
+    local -r application_version="${1}"; shift
 
     printf -- \
         '%s\n' \
@@ -314,12 +320,12 @@ print_version(){
 }
 
 print_application_info(){
-    check_function_parameters_quantity 5 $#
-    local -r application_name="$1"; shift
-    local -r application_version="$1"; shift
-    local -r application_site_url="$1"; shift
-    local -r application_copyright_declaration="$1"; shift
-    local -r application_copyright_notice="$1"
+    check_function_parameters_quantity 5 "${#}"
+    local -r application_name="${1}"; shift
+    local -r application_version="${1}"; shift
+    local -r application_site_url="${1}"; shift
+    local -r application_copyright_declaration="${1}"; shift
+    local -r application_copyright_notice="${1}"; shift
 
     echo "${application_name} ${application_version}"
     echo -e "${application_site_url}"
@@ -546,7 +552,7 @@ process_commandline_parameters(){
 }
 
 process_miscellaneous_requests(){
-    check_function_parameters_quantity 9 $#
+    check_function_parameters_quantity 9 "${#}"
     local -r flag_print_help="${1}"; shift
     local -r flag_print_version="${1}"; shift
     local -r flag_print_about="${1}"; shift
@@ -587,12 +593,12 @@ process_miscellaneous_requests(){
 }
 
 check_runtime_dependencies(){
-    check_function_parameters_quantity 5 $#
-    local -r application_name="$1"; shift
-    local -n command_mkdosfs_ref="$1"; shift
-    local -n command_mkntfs_ref="$1"; shift
-    local -n command_grubinstall_ref="$1"; shift
-    local -n name_grub_prefix_ref="$1"
+    check_function_parameters_quantity 5 "${#}"
+    local -r application_name="${1}"; shift
+    local -n command_mkdosfs_ref="${1}"; shift
+    local -n command_mkntfs_ref="${1}"; shift
+    local -n command_grubinstall_ref="${1}"; shift
+    local -n name_grub_prefix_ref="${1}"; shift
 
     local result=unknown
 
@@ -674,13 +680,13 @@ check_runtime_dependencies(){
     fi
 }
 
-check_permission(){
-    check_function_parameters_quantity 1 $#
-    local -r application_name="$1"
+check_superuser(){
+    check_function_parameters_quantity 1 "${#}"
+    local -r application_name="${1}"; shift
 
     if [ ! "$(id --user)" = 0 ]; then
         print_warning \
-            'You are not running %s as root!\n' \
+            'You are not running %s as the superuser(root)!\n' \
             "${application_name}"
         print_warning \
             'This might be the reason of the following failure.\n'
@@ -689,10 +695,10 @@ check_permission(){
 }
 
 check_runtime_parameters(){
-    check_function_parameters_quantity 4 $#
+    check_function_parameters_quantity 4 "${#}"
     local -n install_mode_ref="${1}"; shift
     local -n source_media_ref="${1}"; shift
-    local -n target_media_ref="${1}"
+    local -n target_media_ref="${1}"; shift
 
     if [ ! -f "${source_media_ref}" ] \
         && [ ! -b "${source_media_ref}" ]; then
@@ -731,7 +737,7 @@ check_runtime_parameters(){
 }
 
 determine_target_parameters(){
-    check_function_parameters_quantity 5 $#
+    check_function_parameters_quantity 5 "${#}"
     local install_mode="${1}"; shift
     local target_media="${1}"; shift
     local -n target_device_ref="${1}"; shift
@@ -792,8 +798,8 @@ determine_target_parameters(){
 }
 
 is_target_busy(){
-    check_function_parameters_quantity 1 $#
-    local device="${1}"
+    check_function_parameters_quantity 1 "${#}"
+    local device="${1}"; shift
 
     if [ "$(mount \
             | grep \
@@ -808,11 +814,11 @@ is_target_busy(){
 }
 
 check_source_and_target_not_busy(){
-    check_function_parameters_quantity 4 $#
-    local install_mode="$1"; shift
-    local source_media="$1"; shift
-    local target_device="$1"; shift
-    local target_partition="$1"
+    check_function_parameters_quantity 4 "${#}"
+    local install_mode="${1}"; shift
+    local source_media="${1}"; shift
+    local target_device="${1}"; shift
+    local target_partition="${1}"; shift
 
     if [ "$(mount \
             | grep \
@@ -846,8 +852,8 @@ check_source_and_target_not_busy(){
 }
 
 wipe_existing_partition_table_and_filesystem_signatures(){
-    check_function_parameters_quantity 1 $#
-    local -r target_device="${1}"
+    check_function_parameters_quantity 1 "${#}"
+    local -r target_device="${1}"; shift
 
     print_info \
         'Wiping all existing partition table and filesystem signatures in %s...\n' \
@@ -863,8 +869,8 @@ wipe_existing_partition_table_and_filesystem_signatures(){
 # Some broken locked-down flash drive will appears to be successfully wiped but actually nothing is written into it and will shown previous partition scheme afterwards.  This is the detection of the case and will bail out if such things happened
 # target_device: The target device file to be checked
 check_if_the_drive_is_really_wiped(){
-    check_function_parameters_quantity 1 $#
-    local -r target_device="$1"
+    check_function_parameters_quantity 1 "${#}"
+    local -r target_device="${1}"; shift
 
     print_info \
         'Ensure that %s is really wiped...\n' \
@@ -890,9 +896,9 @@ check_if_the_drive_is_really_wiped(){
 }
 
 create_target_partition_table(){
-    check_function_parameters_quantity 2 $#
+    check_function_parameters_quantity 2 "${#}"
     local -r target_device="${1}"; shift
-    local -r partition_table_type="${1}"
+    local -r partition_table_type="${1}"; shift
 
     print_info \
         'Creating new partition table on %s...\n' \
@@ -926,8 +932,8 @@ create_target_partition_table(){
 
 # NOTE: This really should be done automatically by GNU Parted after every operation
 workaround_make_system_realize_partition_table_changed(){
-    check_function_parameters_quantity 1 $#
-    local -r target_device="$1"
+    check_function_parameters_quantity 1 "${#}"
+    local -r target_device="${1}"; shift
 
     print_info \
         'Making system realize that partition table has changed...\n'
@@ -943,15 +949,15 @@ workaround_make_system_realize_partition_table_changed(){
 }
 
 create_target_partition(){
-    check_function_parameters_quantity 5 $#
-    local -r target_partition="$1"; shift
+    check_function_parameters_quantity 5 "${#}"
+    local -r target_partition="${1}"; shift
 
     # ENUM_SUPPORTED_FILESYSTEMS
-    local -r filesystem_type="$1"; shift
+    local -r filesystem_type="${1}"; shift
 
-    local -r filesystem_label="$1"; shift
-    local -r command_mkdosfs="$1"; shift
-    local -r command_mkntfs="$1"
+    local -r filesystem_label="${1}"; shift
+    local -r command_mkdosfs="${1}"; shift
+    local -r command_mkntfs="${1}"; shift
 
     # Refer: GNU Parted's (info) manual: Using Parted » Command explanations » mkpart
     # Refer: sudo parted --script /dev/sda help mkpart
@@ -1036,9 +1042,9 @@ create_target_partition(){
 # This routine should be run after create_target_partition and only on target partition's filesystem is NTFS
 # target_device: The target device's entire deice file
 create_uefi_ntfs_support_partition(){
-    check_function_parameters_quantity 1 $#
+    check_function_parameters_quantity 1 "${#}"
 
-    local -r target_device="$1"
+    local -r target_device="${1}"; shift
 
     # FIXME: The partition type should be `fat12` but `fat12` isn't recognized by Parted...
     # NOTE: The --align is set to none because this partition is indeed misaligned, but ignored due to it's small size
@@ -1062,12 +1068,12 @@ create_uefi_ntfs_support_partition(){
 # download_directory: The temporary directory for downloading UEFI:NTFS image from GitHub
 # target_device: For workaround_make_system_realize_partition_table_changed
 install_uefi_ntfs_support_partition(){
-    check_function_parameters_quantity 4 $#
+    check_function_parameters_quantity 4 "${#}"
 
-    local -r rufus_uefi_ntfs_version="$1"; shift
-    local -r uefi_ntfs_partition="$1"; shift
-    local -r download_directory="$1"; shift
-    local -r target_device="$1"
+    local -r rufus_uefi_ntfs_version="${1}"; shift
+    local -r uefi_ntfs_partition="${1}"; shift
+    local -r download_directory="${1}"; shift
+    local -r target_device="${1}"; shift
 
     if ! wget \
         --directory-prefix="${download_directory}" \
@@ -1086,9 +1092,9 @@ install_uefi_ntfs_support_partition(){
 
 # Some buggy BIOSes won't put detected device with valid MBR but no partitions with boot flag toggled into the boot menu, workaround this by setting the first partition's boot flag(which partition doesn't matter as GNU GRUB doesn't depend on it anyway
 workaround_buggy_motherboards_that_ignore_disks_without_boot_flag_toggled(){
-    check_function_parameters_quantity 1 $#
+    check_function_parameters_quantity 1 "${#}"
 
-    local -r target_device="$1"
+    local -r target_device="${1}"; shift
 
     print_warning \
         'Applying workaround for buggy motherboards that will ignore disks with no partitions with the boot flag toggled\n'
@@ -1104,10 +1110,10 @@ workaround_buggy_motherboards_that_ignore_disks_without_boot_flag_toggled(){
 # install_mode: The usb storage creation method to be used
 # target_device: The parent device of the target partition, this is passed in to check UEFI:NTFS filesystem's existence on check_uefi_ntfs_support_partition
 check_target_partition(){
-    check_function_parameters_quantity 3 $#
+    check_function_parameters_quantity 3 "${#}"
     local target_partition="${1}"; shift
     local install_mode="${1}"; shift
-    local target_device="${1}"
+    local target_device="${1}"; shift
 
     local target_filesystem
     target_filesystem="$(
@@ -1138,9 +1144,9 @@ check_target_partition(){
 # Currently it depends on the fact that this partition has a label of "UEFI_NTFS"
 # target_device: The UEFI:NTFS partition residing entier device file
 check_uefi_ntfs_support_partition(){
-    check_function_parameters_quantity 1 $#
+    check_function_parameters_quantity 1 "${#}"
 
-    local -r target_device="$1"
+    local -r target_device="${1}"; shift
 
     if \
         ! \
@@ -1160,43 +1166,26 @@ check_uefi_ntfs_support_partition(){
 }
 
 mount_source_filesystem(){
-    check_function_parameters_quantity 2 $#
-    local source_media="$1"; shift
-    local source_fs_mountpoint="$1"
+    check_function_parameters_quantity 2 "${#}"
+    local source_media="${1}"; shift
+    local source_fs_mountpoint="${1}"; shift
 
     print_info \
         'Mounting source filesystem...\n'
-
     mkdir \
         --parents \
-        "${source_fs_mountpoint}" \
-        || (
-            print_error \
-                'Unable to create "%s" mountpoint directory\n' \
-                "${source_fs_mountpoint}"
-            return 1
-        )
+        "${source_fs_mountpoint}"
     if [ -f "${source_media}" ]; then # ${source_media} is an ISO image
         mount \
             --options loop,ro \
             --types udf,iso9660 \
             "${source_media}" \
-            "${source_fs_mountpoint}" \
-        || (
-            print_error \
-                'Unable to mount source media\n'
-            return 1
-        )
+            "${source_fs_mountpoint}"
     else # ${source_media} is a real optical disk drive (block device)
         mount \
             --options ro \
             "${source_media}" \
-            "${source_fs_mountpoint}" \
-        || (
-            print_error \
-                'Unable to mount source media\n'
-            return 1
-        )
+            "${source_fs_mountpoint}"
     fi
 }
 
@@ -1205,25 +1194,19 @@ mount_source_filesystem(){
 # target_fs_mountpoint: The existing directory used as the target filesystem's mountpoint, for example /mnt/target_filesystem
 # target_fs_type: The filesystem of the target filesystem currently supports: FAT, NTFS
 mount_target_filesystem(){
-    check_function_parameters_quantity 3 $#
-    local target_partition="$1"; shift
-    local target_fs_mountpoint="$1"; shift
+    check_function_parameters_quantity 3 "${#}"
+    local target_partition="${1}"; shift
+    local target_fs_mountpoint="${1}"; shift
 
     # ENUM_SUPPORTED_FILESYSTEMS
-    local target_fs_type="$1"
+    local target_fs_type="${1}"
 
     print_info \
         'Mounting target filesystem...\n'
 
     mkdir \
         --parents \
-        "${target_fs_mountpoint}" \
-        || (
-            print_error \
-                'Unable to create "%s" mountpoint directory\n' \
-                "${target_fs_mountpoint}"
-            return 1
-        )
+        "${target_fs_mountpoint}"
 
     # Determine proper mount options according to filesystem type
     local mount_options='defaults'
@@ -1250,18 +1233,13 @@ mount_target_filesystem(){
         --options "${mount_options}" \
         ${fstype_options} \
         "${target_partition}" \
-        "${target_fs_mountpoint}" \
-        || (
-            print_error \
-                'Unable to mount target partition\n'
-            return 1
-        )
+        "${target_fs_mountpoint}"
 }
 
 check_target_filesystem_free_space(){
-    check_function_parameters_quantity 2 $#
+    check_function_parameters_quantity 2 "${#}"
     local -r target_fs_mountpoint="${1}"; shift
-    local -r source_fs_mountpoint="${1}"
+    local -r source_fs_mountpoint="${1}"; shift
 
     free_space=$(
         df \
@@ -1314,10 +1292,13 @@ check_target_filesystem_free_space(){
 
 # Copying all files from one filesystem to another, with progress reporting
 copy_filesystem_files(){
-    check_function_parameters_quantity 3 "${#}"
+    check_function_parameters_quantity 4 "${#}"
     local source_fs_mountpoint="${1}"; shift
     local target_fs_mountpoint="${1}"; shift
     local target_filesystem_type="${1}"; shift
+    local dd_block_size="${1}"; shift
+
+    local -ir fat32_filesize_limit=4294967295 # 2^32 - 1
 
     local -i total_size
     total_size=$(
@@ -1350,13 +1331,13 @@ copy_filesystem_files(){
                     'Copying "%s"...\n' \
                     "${source_file}"
             fi
-            if [ "${source_file_size}" -lt "${DD_BLOCK_SIZE}" ]; then
+            if [ "${source_file_size}" -lt "${dd_block_size}" ]; then
                 cp "${source_file}" "${dest_file}"
             else
                 # FS_FAT is not a parameter expansion
                 # shellcheck disable=SC2050
                 if [ "${target_filesystem_type}" == FS_FAT ] \
-                    && [ "${source_file_size}" -gt "${FAT32_FILESIZE_LIMIT}" ]; then
+                    && [ "${source_file_size}" -gt "${fat32_filesize_limit}" ]; then
                     if [[ ! "${source_file}" =~ \.wim$ ]]; then
                         print_warning \
                             'Unsupported oversized file "%s" detected, this file will NOT be transferred.\n' \
@@ -1373,7 +1354,8 @@ copy_filesystem_files(){
                         "${source_file}" \
                         "${dest_file}" \
                         "${copied_size}" \
-                        "${total_size}"
+                        "${total_size}" \
+                        "${dd_block_size}"
                 fi
             fi
         else
@@ -1405,11 +1387,12 @@ copy_filesystem_files(){
 # Copy source_file to dest_file, overwrite file if dest_file exists
 # Also report copy_filesystem_files progress during operation
 copy_large_file(){
-    check_function_parameters_quantity 4 "${#}"
+    check_function_parameters_quantity 5 "${#}"
     local -r source_file="${1}"; shift
     local -r dest_file="${1}"; shift
     local -ir caller_copied_size="${1}"; shift
-    local -ir caller_total_size="${1}"
+    local -ir caller_total_size="${1}"; shift
+    local -ir dd_block_size="${1}"; shift
 
     local -i source_file_size
     source_file_size=$(
@@ -1420,7 +1403,7 @@ copy_large_file(){
 
     # block count of the source file
     local -i block_number
-    ((block_number = source_file_size / DD_BLOCK_SIZE + 1))
+    ((block_number = source_file_size / dd_block_size + 1))
     unset source_file_size
 
     if [ -f "${dest_file}" ]; then
@@ -1431,7 +1414,7 @@ copy_large_file(){
     local -i i=0 copied_size_total percentage; while [ "${i}" -lt "${block_number}" ]; do
         dd \
             if="${source_file}" \
-            bs="${DD_BLOCK_SIZE}" \
+            bs="${dd_block_size}" \
             skip="${i}" \
             seek="${i}" \
             of="${dest_file}" \
@@ -1442,7 +1425,7 @@ copy_large_file(){
         # Calculate and report progress
         # BASHDOC: Basic Shell Features » Shell Expansions » Arithmetic Expansion
         # BASHDOC: Bash Features » Shell Arithmetic
-        ((copied_size_total = caller_copied_size + DD_BLOCK_SIZE * i)) || true
+        ((copied_size_total = caller_copied_size + dd_block_size * i)) || true
         ((percentage = (copied_size_total * 100) / caller_total_size)) || true
         echo -en "${percentage}%\\r"
     done; unset i copied_size_total percentage
@@ -1517,7 +1500,7 @@ copy_oversized_wim_file(){
 workaround_support_windows_7_uefi_boot(){
     check_function_parameters_quantity 2 "${#}"
     local source_fs_mountpoint="${1}"; shift
-    local target_fs_mountpoint="${1}"
+    local target_fs_mountpoint="${1}"; shift
 
     # Apply workaround only if the source is based on Windows 7, and EFI version of bootmgr is in place
     if ! grep \
@@ -1618,9 +1601,9 @@ workaround_support_windows_7_uefi_boot(){
 
 install_legacy_pc_bootloader_grub(){
     check_function_parameters_quantity 3 "${#}"
-    local -r target_fs_mountpoint="${1}"; shift 1
-    local -r target_device="${1}"; shift 1
-    local -r command_grubinstall="${1}"
+    local -r target_fs_mountpoint="${1}"; shift
+    local -r target_device="${1}"; shift
+    local -r command_grubinstall="${1}"; shift
 
     print_info \
         'Installing GRUB bootloader for legacy PC booting support...\n'
@@ -1636,10 +1619,10 @@ install_legacy_pc_bootloader_grub(){
 # target_fs_mountpoint: Target filesystem's mountpoint(where GRUB is installed)
 # name_grub_prefix: May be different between distributions, so need to be specified (grub/grub2)
 install_legacy_pc_bootloader_grub_config(){
-    check_function_parameters_quantity 2 $#
+    check_function_parameters_quantity 2 "${#}"
 
-    local -r target_fs_mountpoint="$1"; shift
-    local -r name_grub_prefix="$1"
+    local -r target_fs_mountpoint="${1}"; shift
+    local -r name_grub_prefix="${1}"; shift
 
     print_info \
         'Installing custom GRUB config for legacy PC booting...\n'
@@ -1791,7 +1774,7 @@ trap_interrupt(){
 
 trap_return(){
     check_function_parameters_quantity 1 "${#}"
-    local returning_function="${1}"
+    local returning_function="${1}"; shift
 
     for ignored_function in \
         check_function_parameters_quantity \
@@ -1862,8 +1845,8 @@ util_call_external_command(){
 # Parameters:
 # - color: color of the next message, or `none` to reset to default color
 switch_terminal_text_color(){
-    check_function_parameters_quantity 1 $#
-    local -r color="$1"
+    check_function_parameters_quantity 1 "${#}"
+    local -r color="${1}"; shift
 
     case "${color}" in
         black)
@@ -1897,7 +1880,7 @@ switch_terminal_text_color(){
 
 # Print formatted message with color
 printf_with_color(){
-    if [ ${#} -lt 2 ]; then
+    if [ "${#}" -lt 2 ]; then
         print_fatal \
             'Parameter quantity illegal, please report bug.\n'
         exit 1
@@ -2027,7 +2010,7 @@ print_debug(){
 shift_array(){
     check_function_parameters_quantity 1 "${#}"
 
-    local -n array_ref="${1}"
+    local -n array_ref="${1}"; shift
 
     if [ "${#array_ref[@]}" -eq 0 ]; then
         print_fatal \
@@ -2047,9 +2030,9 @@ shift_array(){
 }
 
 is_var_set_and_not_empty(){
-    check_function_parameters_quantity 1 $#
+    check_function_parameters_quantity 1 "${#}"
 
-    local parameter_name="${1}"
+    local parameter_name="${1}"; shift
 
     if [ ! -v "${parameter_name}" ]; then
         return 1
@@ -2070,7 +2053,8 @@ is_var_set_and_not_empty(){
 check_function_parameters_quantity(){
     if [ "${#}" -ne 2 ]; then
         print_fatal \
-            'Function requires %u parameters, but %u is given\n' \
+            'Function %s requires %u parameters, but %u is given\n' \
+            "${FUNCNAME[0]}" \
             2 \
             "${#}"
         exit 1
@@ -2083,7 +2067,8 @@ check_function_parameters_quantity(){
 
     if [ "${given_parameter_quantity}" -ne "${expected_parameter_quantity}" ]; then
         print_fatal \
-            'Function requires %u parameters, but %u is given\n' \
+            'Function %s requires %u parameters, but %u is given\n' \
+            "${FUNCNAME[1]}" \
             "${expected_parameter_quantity}" \
             "${given_parameter_quantity}"
         exit 1
@@ -2174,9 +2159,6 @@ declare flag_verbose=false
 # Disable message coloring when set to `true`, set by --no-color
 declare flag_no_color=false
 
-declare -ir DD_BLOCK_SIZE="((4 * 1024 * 1024))" # 4MiB
-declare -ir FAT32_FILESIZE_LIMIT=4294967295 # 2^32 - 1
-
 # NOTE: Need to pass to traps, so need to be global
 declare \
     source_fs_mountpoint \
@@ -2206,4 +2188,5 @@ declare wimlib_imagex_pid=
 
 init \
     "${script_name}" \
-    "${RUFUS_UEFI_NTFS_VERSION}"
+    "${RUFUS_UEFI_NTFS_VERSION}" \
+    "${DD_BLOCK_SIZE}"
