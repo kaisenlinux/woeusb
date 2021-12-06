@@ -21,8 +21,10 @@ DD_BLOCK_SIZE="${DD_BLOCK_SIZE:-$((4 * 1024 * 1024))}" # 4MiB
 
 # Entry point of the main code
 init(){
-    check_function_parameters_quantity 3 "${#}"
+    check_function_parameters_quantity 5 "${#}"
     local -r program_name="${1}"; shift
+    local -n flag_source_filesystem_mounted_ref="${1}"; shift
+    local -n flag_target_filesystem_mounted_ref="${1}"; shift
     local -r rufus_uefi_ntfs_version="${1}"; shift
     local -r dd_block_size="${1}"; shift
 
@@ -156,6 +158,7 @@ init(){
             "${source_media}"
         exit 1
     fi
+    flag_source_filesystem_mounted_ref=true
 
     if [ "${install_mode}" = device ]; then
         wipe_existing_partition_table_and_filesystem_signatures \
@@ -187,6 +190,7 @@ init(){
             "${install_mode}" \
             "${target_device}"
     fi
+    flag_target_filesystem_mounted_ref=true
 
     if ! mount_target_filesystem \
         "${target_partition}" \
@@ -235,6 +239,154 @@ init(){
     exit 0
 }
 
+# FIXME: Doesn't support only printing LHS of the ATX style heading
+print_markdown_heading(){
+    local text="${1}"; shift
+    local -i level="${1}"; shift
+    # [atx|setext]
+    local style="${1}"; shift
+
+    local setext_separator_max_length
+    if test "${#}" -ne 0; then
+        setext_separator_max_length="${1}"; shift
+    fi
+
+    case "${style}" in
+        atx)
+            if test -v setext_separator_max_length; then
+                printf \
+                    '%s: Error: The setext_separator_max_length parameter can only be used with the Setext heading style.\n' \
+                    "${FUNCNAME[0]}" \
+                    1>&2
+                return 1
+            fi
+
+            if test "${level}" -gt 6; then
+                printf \
+                    '%s: Error: Atx heading style only support at most level 6, got %s\n' \
+                    "${FUNCNAME[0]}" \
+                    "${level}" \
+                    1>&2
+                return 1
+            fi
+
+            local -i i
+            local heading_marker=
+            for((i=0; i<level; i++)); do
+                heading_marker+='#'
+            done
+            printf \
+                '%s %s %s\n' \
+                "${heading_marker}" \
+                "${text}" \
+                "${heading_marker}"
+        ;;
+        setext)
+            if test "${level}" -gt 2; then
+                printf \
+                    '%s: Error: Setext heading style only support at most level 2, got %s\n' \
+                    "${FUNCNAME[0]}" \
+                    "${level}" \
+                    1>&2
+                return 1
+            fi
+
+            if test -v setext_separator_max_length \
+                && [[ ! "${setext_separator_max_length}" =~ ([[:digit:]]+|terminal) ]]; then
+                printf \
+                    "%s: Error: The setext_separator_max_length parameter only accepts numbers and 'terminal' as argument, but got \"%s\".\\n" \
+                    1>&2 \
+                    "${FUNCNAME[0]}" \
+                    "${setext_separator_max_length}"
+                return 1
+            fi
+
+            local -i separator_length
+            local -i terminal_columns
+            terminal_columns="$(
+                stty size \
+                    | awk '{print $2}'
+            )"
+
+            local -i text_length="${#text}"
+
+            if ! test -v setext_separator_max_length; then
+                if test "${terminal_columns}" -gt "${text_length}"; then
+                    separator_length="${text_length}"
+                else
+                    separator_length="${terminal_columns}"
+                fi
+            elif test "${setext_separator_max_length}" == terminal; then
+                separator_length="${terminal_columns}"
+            else
+                # Use terminal width if setext_separator_max_length will
+                # cause line wrap
+                if test "${terminal_columns}" -gt "${setext_separator_max_length}"; then
+                    separator_length="${setext_separator_max_length}"
+                else
+                    separator_length="${terminal_columns}"
+                fi
+            fi
+
+            local -i i
+            local separator=
+            for((i=0; i<separator_length; i++)); do
+                if test "${level}" -eq 1; then
+                    separator+='='
+                else
+                    separator+='-'
+                fi
+            done
+
+            printf \
+                -- \
+                '%s\n%s\n' \
+                "${text}" \
+                "${separator}"
+        ;;
+        *)
+            printf \
+                '%s: Error: Unsupported markdown heading style "%s".\n' \
+                "${FUNCNAME[0]}" \
+                "${style}" \
+                1>&2
+            return 1
+        ;;
+    esac
+
+    # Additional linebreak to separate heading and context
+    printf '\n'
+}
+
+print_markdown_paragraph(){
+    local text="${1}"; shift
+
+    printf \
+        -- \
+        '%s\n' \
+        "${text}"
+    printf \
+        '\n'
+}
+
+print_markdown_codeblock(){
+    local text="${1}"; shift
+    if test "${#}" -ne 0; then
+        local syntax_hint="${1}"; shift
+    fi
+
+    if ! test -v syntax_hint; then
+        printf '```\n'
+    else
+        printf '```%s\n' "${syntax_hint}"
+    fi
+    printf '%s\n' "${text}"
+    printf '```\n'
+
+    # Separate with following content
+    printf '\n'
+}
+
 print_help(){
     check_function_parameters_quantity 3 "${#}"
 
@@ -243,80 +395,211 @@ print_help(){
     local -r program_name="${1}"; shift
 
     set +o xtrace
-    echo -e "${application_name} ${application_version} Help Information"
-    echo -e "======================================"
-    echo -e "${application_name} can create a bootable Microsoft Windows(R) USB storage device from an existing Windows optical disk or an ISO disk image."
-    echo -e
-    echo -e 'Currently two creation methods are supported:'
-    echo -e
-    echo -e '    --device, -d'
-    echo -e
-    echo -e '        ''Completely WIPE the entire USB storage device, then build a bootable Windows USB device from scratch.'
-    echo -e '        ''WARNING: All previous data on the device will be gone!'
-    echo -e
-    echo -e '        '"${program_name} --device <source media path> <device>"
-    echo -e '        ''Examples:'
-    echo -e '        '"- ${program_name} --device Windows7_x64.iso /dev/sdX"
-    echo -e '        '"- ${program_name} --device /dev/sr0 /dev/sdX"
-    echo -e
-    echo -e '    --partition, -p'
-    echo -e
-    echo -e '        ''Copy Windows files to an existing partition of a USB storage device and make it bootable.  This allows files to coexist as long as no filename conflict exists.'
-    echo -e '        ''WARNING: All files that has the same name will be overwritten!'
-    echo -e
-    echo -e '        '"${program_name} --partition <source media path> <partition>"
-    echo -e '        ''Examples:'
-    echo -e '        '"- ${program_name} --partition Windows7_x64.iso /dev/sdX1"
-    echo -e '        '"- ${program_name} --partition /dev/sr0 /dev/sdX1"
-    echo -e
-    echo -e '## ''Command-line Options'' ##'
-    echo -e '    --verbose, -v'
-    echo -e '        ''Verbose mode'
-    echo -e
-    echo -e '    --help, -h'
-    echo -e '        ''Show this help message and exit'
-    echo -e
-    echo -e '    --version, -V'
-    echo -e '        ''Print application version'
-    echo -e
-    echo -e '    --about, -ab'
-    echo -e '        ''Show info about this application'
-    echo -e
-    echo -e '    --no-color'
-    echo -e '        ''Disable message coloring'
-    echo -e
-    echo -e '    --debug'
-    echo -e '        ''Enable script debugging'
-    echo -e
-    echo -e '    --label, -l <filesystem_label>'
-    echo -e '        ''Specify label for the newly created file system in --device creation method'
-    echo -e '        ''Note that the label is not verified for validity and may be illegal for the filesystem'
-    echo -e
-    echo -e '    --workaround-bios-boot-flag'
-    echo -e '        '"Workaround BIOS bug that won't include the device in boot menu if non of the partition's boot flag is toggled"
-    echo -e
-    echo -e '    --debugging-internal-function-call <function name> (function_argument)...'
-    echo -e '        ''Development option for developers to test certain function without running the entire build'
-    echo -e
-    echo -e '    --target-filesystem, --tgt-fs <filesystem name>'
-    echo -e '        '"Specify the filesystem to use as the target partition's filesystem."
-    echo -e '        ''Currently supported: FAT(default)/NTFS'
-    echo -e
-    echo -e '    --for-gui'
-    echo -e '        ''No longer supported, reserved for compatibility with the wrapper programs'
-    echo -e
-}
+    print_markdown_heading \
+        "$(
+            printf \
+                '%s %s Help Information' \
+                "${application_name}" \
+                "${application_version}"
+        )" \
+        1 \
+        setext
+    print_markdown_paragraph \
+        "$(
+            printf \
+                '%s can create a bootable Microsoft Windows(R) USB storage device from an existing Windows optical disk or an ISO disk image.' \
+                "${application_name}"
+        )"
 
-# Print application version then exit, for debugging purpose.
-# application_version: Version of the application
-print_version(){
-    check_function_parameters_quantity 1 "${#}"
+    print_markdown_heading \
+        'Supported installation drive preparation modes' \
+        2 \
+        setext
+    print_markdown_paragraph \
+        'Currently two creation methods are supported:'
 
-    local -r application_version="${1}"; shift
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+            '`--device`, `-d`' \
+            3 \
+            atx
+    print_markdown_paragraph \
+        'Completely WIPE the entire USB storage device, then build a bootable Windows USB device from scratch.'
+    print_markdown_paragraph \
+        'WARNING: All previous data on the device will be gone!'
+    print_markdown_codeblock \
+        "$(
+            printf \
+                '$ %s --device <source media path> <device>\n' \
+                "${program_name}"
+        )" \
+        synopsis
+    print_markdown_codeblock \
+        "$(
+            printf \
+                -- \
+                '%s --device Windows7_x64.iso /dev/sdX' \
+                "${program_name}"
+            printf '\n'
+            printf \
+                -- \
+                '%s --device /dev/sr0 /dev/sdX' \
+                "${program_name}"
+        )" \
+        example
 
-    printf -- \
-        '%s\n' \
-        "${application_version}"
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+            '`--partition`, `-p`' \
+            3 \
+            atx
+    print_markdown_paragraph \
+        'Copy Windows files to an existing partition of a USB storage device and make it bootable.  This allows files to coexist as long as no filename conflict exists.'
+    print_markdown_paragraph \
+        'WARNING: All files that has the same name will be overwritten!'
+    print_markdown_codeblock \
+        "$(
+            printf \
+                '%s --partition <source media path> <partition>' \
+                "${program_name}"
+        )" \
+        synopsis
+    print_markdown_codeblock \
+        "$(
+            printf \
+                -- \
+                '%s --partition Windows7_x64.iso /dev/sdX1' \
+                "${program_name}"
+            printf '\n'
+            printf \
+                -- \
+                '%s --partition /dev/sr0 /dev/sdX1' \
+                "${program_name}"
+        )" \
+        example
+
+    print_markdown_heading \
+            'Command-line Options' \
+            2 \
+            setext
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--verbose`, `-v`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Verbose mode'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--help`, `-h`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Show this help message and exit'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--version`, `-V`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Print application version'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--about`, `-ab`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Show info about this application'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--no-color`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Disable message coloring'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--debug`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Enable script debugging'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--label`, `-l <filesystem_label>`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Specify label for the newly created file system in --device creation method'
+    print_markdown_paragraph \
+        'Note that the label is not verified for validity and may be illegal for the filesystem'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--workaround-bios-boot-flag`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        "Workaround BIOS bug that won't include the device in boot menu if non of the partition's boot flag is toggled"
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--debugging-internal-function-call <function name> (function_argument)...`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'Development option for developers to test certain function without running the entire build\n'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--target-filesystem`, `--tgt-fs <filesystem name>`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        "Specify the filesystem to use as the target partition's filesystem."
+    print_markdown_paragraph \
+        'Currently supported: FAT(default)/NTFS'
+
+    # The backtick pairs are Markdown's <code> markup, not a shell
+    # command substitution
+    # shellcheck disable=SC2016
+    print_markdown_heading \
+        '`--for-gui`' \
+        3 \
+        atx
+    print_markdown_paragraph \
+        'No longer supported, reserved for compatibility with the wrapper programs'
 }
 
 print_application_info(){
@@ -574,7 +857,8 @@ process_miscellaneous_requests(){
 
     if [ "${flag_print_version}" == true ]; then
         trap - EXIT
-        print_version \
+        printf -- \
+            '%s\n' \
             "${application_version}"
         exit 0
     fi
@@ -620,6 +904,7 @@ check_runtime_dependencies(){
         readlink \
         rm \
         stat \
+        stty \
         wget \
         wimlib-imagex \
         wipefs
@@ -1710,16 +1995,14 @@ trap_exit(){
         sleep 1
     fi
 
-    if is_var_set_and_not_empty \
-        source_fs_mountpoint; then
+    if test "${flag_source_filesystem_mounted}" == true; then
         if ! cleanup_mountpoint  \
             "${source_fs_mountpoint}"; then
             flag_unclean=true
         fi
     fi
 
-    if is_var_set_and_not_empty \
-        target_fs_mountpoint; then
+    if test "${flag_target_filesystem_mounted}" == true; then
         if ! cleanup_mountpoint \
             "${target_fs_mountpoint}"; then
             local -i return_value="${?}"
@@ -2065,15 +2348,32 @@ check_function_parameters_quantity(){
     # The actual given parameter quantity, simply pass "${#}" will do
     local -i given_parameter_quantity="${1}"
 
-    if [ "${given_parameter_quantity}" -ne "${expected_parameter_quantity}" ]; then
+    local failed=false
+
+    if ! [[ $expected_parameter_quantity =~ ^[[:digit:]]+$ ]]; then
+        local test_expression="${expected_parameter_quantity}"
+        # test_expression is supposed to be word splitted here
+        # shellcheck disable=SC2086
+        if ! test "${given_parameter_quantity}" ${test_expression}; then
+            failed=true
+        fi
+    else
+        if [ "${given_parameter_quantity}" -ne "${expected_parameter_quantity}" ]; then
+            failed=true
+        fi
+    fi
+
+    if test "${failed}" == true; then
         print_fatal \
             'Function %s requires %u parameters, but %u is given\n' \
             "${FUNCNAME[1]}" \
             "${expected_parameter_quantity}" \
             "${given_parameter_quantity}"
+        # FATAL error
         exit 1
+    else
+        return 0
     fi
-    return 0
 }
 
 # Generate reliable and user-friendly timestamps
@@ -2159,6 +2459,10 @@ declare flag_verbose=false
 # Disable message coloring when set to `true`, set by --no-color
 declare flag_no_color=false
 
+# Need to be consumed by traps for clean-up
+declare flag_source_filesystem_mounted=false
+declare flag_target_filesystem_mounted=false
+
 # NOTE: Need to pass to traps, so need to be global
 declare \
     source_fs_mountpoint \
@@ -2188,5 +2492,7 @@ declare wimlib_imagex_pid=
 
 init \
     "${script_name}" \
+    flag_source_filesystem_mounted \
+    flag_target_filesystem_mounted \
     "${RUFUS_UEFI_NTFS_VERSION}" \
     "${DD_BLOCK_SIZE}"

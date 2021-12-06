@@ -7,7 +7,7 @@ Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
  
      local -r application_name='WoeUSB'
 -    local -r application_version='@@WOEUSB_VERSION@@'
-+    local -r application_version='5.2.2'
++    local -r application_version='5.2.4'
  
      local \
          flag_print_help=false \

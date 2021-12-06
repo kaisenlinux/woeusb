@@ -1,3 +1,9 @@
+woeusb (5.2.4-1kaisen) kaisen-packages; urgency=medium
+
+  * Import 5.2.4 version
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Mon, 06 Dec 2021 22:10:06 +0200
+
 woeusb (5.2.2-1kaisen) kaisen-packages; urgency=medium
 
   * Import 5.2.2 version
