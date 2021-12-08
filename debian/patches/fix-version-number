@@ -1,8 +1,8 @@
 Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 
---- woeusb-5.2.2.orig/sbin/woeusb
-+++ woeusb-5.2.2/sbin/woeusb
-@@ -27,7 +27,7 @@ init(){
+--- woeusb-5.2.4.orig/sbin/woeusb
++++ woeusb-5.2.4/sbin/woeusb
+@@ -29,7 +29,7 @@ init(){
      local -r dd_block_size="${1}"; shift
  
      local -r application_name='WoeUSB'
@@ -11,3 +11,14 @@ Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
  
      local \
          flag_print_help=false \
+--- woeusb-5.2.4.orig/share/man/man1/woeusb.1
++++ woeusb-5.2.4/share/man/man1/woeusb.1
+@@ -3,7 +3,7 @@
+ \" Copyright © 2021 林博仁(Buo-ren, Lin) <Buo.Ren.Lin@gmail.com>
+ \" SPDX-License-Identifier: GPL-3.0-or-later
+ 
+-.TH woeusb 1 "@@WOEUSB_VERSION@@" "WoeUSB" "WoeUSB User Manual"
++.TH woeusb 1 "5.2.4" "WoeUSB" "WoeUSB User Manual"
+ .SH NAME
+ woeusb \- Bootable Windows installation/PE USB storage creator
+ 

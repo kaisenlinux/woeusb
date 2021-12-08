@@ -1,3 +1,9 @@
+woeusb (5.2.4-2kaisen) kaisen-packages; urgency=medium
+
+  * Update patch to add static version number of the manpage
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Wed, 08 Dec 2021 18:54:07 +0200
+
 woeusb (5.2.4-1kaisen) kaisen-packages; urgency=medium
 
   * Import 5.2.4 version
