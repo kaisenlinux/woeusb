@@ -11,7 +11,7 @@ Vcs-Browser: https://gitlab.com/kaisenlinux/packages/woeusb
 Package: woeusb
 Section: utils
 Architecture: amd64
-Depends: bash, dosfstools, gettext, grub2-common, grub-pc-bin, ntfs-3g, p7zip-full, parted, coreutils, wget, libc6, libgcc-s1, libstdc++6, libwxbase3.0-0v5, wimtools, libwim15, ${shlibs:Depends}
+Depends: bash, dosfstools, gettext, grub2-common, grub-pc-bin, ntfs-3g, p7zip-full, parted, coreutils, wget, libc6, libgcc-s1, libstdc++6, libwxbase3.2-1, wimtools, libwim15, ${shlibs:Depends}
 Description: Bootable Windows installation/PE USB storage creator
  This package contains two programs:
  .
